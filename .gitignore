@@ -1,0 +1,9 @@
+# Mengabaikan file object hasil kompilasi
+*.o
+
+# Mengabaikan file eksekusi (binary)
+admin
+
+# Mengabaikan file database lokal
+*.db
+data.db
