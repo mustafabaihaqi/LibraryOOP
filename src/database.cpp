@@ -2,7 +2,6 @@
 #include <iostream>
 
 Database::Database(const std::string& dbFile) {
-    // Membuka koneksi ke file database. Jika file tidak ada, SQLite akan membuatnya.
     int rc = sqlite3_open(dbFile.c_str(), &connection_);
     if (rc != SQLITE_OK) {
         std::cerr << "Gagal membuka database: " << sqlite3_errmsg(connection_) << std::endl;
@@ -12,7 +11,7 @@ Database::Database(const std::string& dbFile) {
 }
 
 Database::~Database() {
-    // Menutup koneksi secara otomatis saat objek Database keluar dari scope (RAII)
+    // Menutup koneksi secara otomatis
     if (connection_) {
         sqlite3_close(connection_);
         std::cout << "[OK] Koneksi database ditutup." << std::endl;
@@ -21,7 +20,6 @@ Database::~Database() {
 
 bool Database::exec(const std::string& sql) {
     char* errMsg = nullptr;
-    // sqlite3_exec mengeksekusi query SQL mentah
     int rc = sqlite3_exec(connection_, sql.c_str(), nullptr, nullptr, &errMsg);
     
     if (rc != SQLITE_OK) {

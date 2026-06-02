@@ -143,7 +143,7 @@ void manageBooks(BookRepository& bookRepo) {
                 if (std::cin >> id) {
                     try {
                         Book b = bookRepo.findById(id);
-                        // Validasi tambahan: Buku yang sedang dipinjam tidak boleh dihapus [cite: 238]
+                        // Validasi tambahan: Buku yang sedang dipinjam tidak boleh dihapus 
                         if (!b.isAvailable()) {
                             std::cout << "[!] Gagal: Buku sedang dipinjam dan tidak dapat dihapus.\n";
                         } else {
@@ -268,6 +268,103 @@ void manageMembers(MemberRepository& memberRepo) {
     }
 }
 
+// === FUNGSI SUB-MENU ISSUE / RETURN LOAN ===
+void manageLoans(LoanRepository& loanRepo, BookRepository& bookRepo, MemberRepository& memberRepo) {
+    char action;
+    bool inMenu = true;
+
+    while (inMenu) {
+        std::cout << "\n======================================================\n";
+        std::cout << "                 ISSUE / RETURN LOAN                  \n";
+        std::cout << "======================================================\n";
+        
+        auto activeLoans = loanRepo.listActiveLoans();
+        std::cout << std::left << std::setw(5) << "ID" 
+                  << std::setw(25) << "Book Title" 
+                  << std::setw(20) << "Member Name" 
+                  << "Due Date\n";
+        std::cout << "------------------------------------------------------\n";
+        if (activeLoans.empty()) {
+            std::cout << "Tidak ada peminjaman aktif saat ini.\n";
+        } else {
+            for (const auto& l : activeLoans) {
+                std::cout << std::left << std::setw(5) << l.loanId 
+                          << std::setw(25) << l.bookTitle.substr(0, 23) 
+                          << std::setw(20) << l.memberName.substr(0, 18) 
+                          << l.dueDate << "\n";
+            }
+        }
+        std::cout << "------------------------------------------------------\n";
+
+        std::cout << "Action [i]ssue, [r]eturn, [b]ack: ";
+        std::cin >> action;
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        switch (tolower(action)) {
+            case 'i': {
+                int bookId;
+                std::string memberId;
+                
+                std::cout << ">> Peminjaman Buku\nMasukkan ID Buku: ";
+                if (!(std::cin >> bookId)) {
+                    std::cin.clear();
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    std::cout << "[!] ID Buku tidak valid.\n";
+                    break;
+                }
+                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                
+                std::cout << "Masukkan ID Anggota: ";
+                std::getline(std::cin, memberId);
+
+                try {
+                    // Validasi apakah buku dan member benar-benar ada
+                    Book b = bookRepo.findById(bookId);
+                    Member m = memberRepo.findById(memberId);
+                    
+                    if (!b.isAvailable()) {
+                        std::cout << "[!] Gagal: Buku sedang dipinjam oleh orang lain.\n";
+                    } else {
+                        loanRepo.issueLoan(bookId, memberId);
+                        std::cout << "[OK] Buku berhasil dipinjamkan hingga 7 hari ke depan.\n";
+                    }
+                } catch (const std::exception& e) {
+                    std::cout << "[!] Error: " << e.what() << "\n";
+                }
+                break;
+            }
+            case 'r': {
+                int bookId;
+                std::cout << ">> Pengembalian Buku\nMasukkan ID Buku yang dikembalikan: ";
+                if (std::cin >> bookId) {
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    try {
+                        Book b = bookRepo.findById(bookId);
+                        if (b.isAvailable()) {
+                            std::cout << "[!] Gagal: Buku tersebut tidak sedang dipinjam (tersedia).\n";
+                        } else {
+                            loanRepo.returnLoan(bookId);
+                            std::cout << "[OK] Buku berhasil dikembalikan ke perpustakaan.\n";
+                        }
+                    } catch (const std::exception& e) {
+                        std::cout << "[!] Error: " << e.what() << "\n";
+                    }
+                } else {
+                    std::cin.clear();
+                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    std::cout << "[!] Input tidak valid.\n";
+                }
+                break;
+            }
+            case 'b':
+                inMenu = false;
+                break;
+            default:
+                std::cout << "[!] Pilihan tidak valid.\n";
+        }
+    }
+}
+
 int main() {
     Database db("data.db");
 
@@ -298,23 +395,23 @@ int main() {
         "FOREIGN KEY(member_id) REFERENCES members(id));";
     db.exec(createTableSQL);
 
-    std::string seedDataSQL = 
-        "INSERT OR IGNORE INTO books (id, title, author, available) VALUES "
-        "(1, 'Laskar Pelangi', 'Nidji', 1), "
-        "(2, 'Kicau Mania', 'Ndarboy Genk', 1), "
-        "(3, '67', 'brainrot', 0), "
-        "(4, 'Skripsi susah? Ternak lele aja', 'Mahasiswa desperate', 1), "
-        "(5, 'Trik Sukses Bisnis Angkringan', 'Yanto GOR Pancasila', 1);"
+    // std::string seedDataSQL = 
+    //     "INSERT OR IGNORE INTO books (id, title, author, available) VALUES "
+    //     "(1, 'Laskar Pelangi', 'Nidji', 1), "
+    //     "(2, 'Kicau Mania', 'Ndarboy Genk', 1), "
+    //     "(3, '67', 'brainrot', 0), "
+    //     "(4, 'Skripsi susah? Ternak lele aja', 'Mahasiswa desperate', 1), "
+    //     "(5, 'Trik Sukses Bisnis Angkringan', 'Yanto GOR Pancasila', 1);"
 
-        "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'admin123', 'admin');"
+    //     "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'admin123', 'admin');"
 
-        "INSERT OR IGNORE INTO members (id, name, email) VALUES "
-        "('M001', 'Budi Santoso', 'budi@example.com'), "
-        "('M002', 'Siti Aminah', 'siti@example.com');";
-    db.exec(seedDataSQL);
+    //     "INSERT OR IGNORE INTO members (id, name, email) VALUES "
+    //     "('M001', 'Budi Santoso', 'budi@example.com'), "
+    //     "('M002', 'Siti Aminah', 'siti@example.com');";
+    // db.exec(seedDataSQL);
 
-    // === 2. SISTEM LOGIN CLI ===
-    std::cout << "== Library Admin Console ==" << std::endl; // [cite: 65]
+    // === SISTEM LOGIN CLI ===
+    std::cout << "== Library Admin Console ==" << std::endl; 
 
     std::string username, password;
     int attempts = 0;
@@ -344,11 +441,12 @@ int main() {
         return 1; 
     }
 
-    std::cout << "[OK] Login OK. Welcome, " << username << ".\n" << std::endl; // [cite: 68]
+    std::cout << "[OK] Login OK. Welcome, " << username << ".\n" << std::endl; // 
 
     // === 3. MENU UTAMA ===
     BookRepository bookRepo(db);
     MemberRepository memberRepo(db);
+    LoanRepository loanRepo(db);
     char choice;
     bool running = true;
 
@@ -369,11 +467,9 @@ int main() {
                 break;
             case '2':
                 manageMembers(memberRepo);
-                // TODO: Panggil sub-menu anggota
                 break;
             case '3':
-                std::cout << "\n>> Memasuki menu Issue / Return Loan...\n";
-                // TODO: Panggil sub-menu sirkulasi peminjaman
+                manageLoans(loanRepo, bookRepo, memberRepo);
                 break;
             case 'Q':
             case 'q':

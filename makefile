@@ -1,7 +1,5 @@
-# Menentukan compiler yang digunakan
 CXX = g++
 
-# Flag kompilasi: menggunakan C++17 dan mengaktifkan peringatan kode
 CXXFLAGS = -std=c++17 -Wall -Wextra
 
 # Flag untuk menghubungkan library eksternal (contoh: SQLite)

@@ -189,3 +189,68 @@ void MemberRepository::remove(const std::string& id) {
 
     sqlite3_finalize(stmt);
 }
+
+// === IMPLEMENTASI LOAN REPOSITORY ===
+
+void LoanRepository::issueLoan(int bookId, const std::string& memberId) {
+    // 1. Masukkan data ke tabel loans dengan due_date 7 hari dari sekarang
+    std::string sqlInsert = "INSERT INTO loans (book_id, member_id, due_date) VALUES (?, ?, date('now', '+7 days'));";
+    sqlite3_stmt* stmt;
+    
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlInsert.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_bind_text(stmt, 2, memberId.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    // 2. Ubah status buku menjadi tidak tersedia (0)
+    std::string sqlUpdate = "UPDATE books SET available = 0 WHERE id = ?;";
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+void LoanRepository::returnLoan(int bookId) {
+    // Hapus riwayat dari tabel loans
+    std::string sqlDelete = "DELETE FROM loans WHERE book_id = ?;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlDelete.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    // 2. Ubah status buku kembali tersedia 
+    std::string sqlUpdate = "UPDATE books SET available = 1 WHERE id = ?;";
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+}
+
+std::vector<LoanRecord> LoanRepository::listActiveLoans() {
+    std::vector<LoanRecord> activeLoans;
+    std::string sql = "SELECT l.id, b.title, m.name, l.due_date "
+                      "FROM loans l "
+                      "JOIN books b ON l.book_id = b.id "
+                      "JOIN members m ON l.member_id = m.id;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(db_.getConnection(), sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            LoanRecord record;
+            record.loanId = sqlite3_column_int(stmt, 0);
+            record.bookTitle = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            record.memberName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            record.dueDate = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            activeLoans.push_back(record);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return activeLoans;
+}

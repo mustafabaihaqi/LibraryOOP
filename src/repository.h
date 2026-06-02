@@ -2,7 +2,6 @@
 #include <vector>
 #include "Database.h"
 
-// Interface Template Generik
 template <typename T>
 class Repository {
 public:
@@ -23,7 +22,6 @@ private:
 public:
     BookRepository(Database& db) : db_(db) {}
 
-    // Deklarasi override fungsi dari template Repository<T>
     Book findById(int id) override;
     void save(const Book& obj) override;
     void remove(int id) override;
@@ -42,4 +40,22 @@ public:
     Member findById(const std::string& id);
     std::vector<Member> listAll();
     void remove(const std::string& id);
+};
+
+struct LoanRecord {
+    int loanId;
+    std::string bookTitle;
+    std::string memberName;
+    std::string dueDate;
+};
+
+class LoanRepository {
+private:
+    Database& db_;
+public:
+    LoanRepository(Database& db) : db_(db) {}
+    
+    void issueLoan(int bookId, const std::string& memberId);
+    void returnLoan(int bookId);
+    std::vector<LoanRecord> listActiveLoans();
 };
