@@ -23,7 +23,8 @@ Akses Web sebagai user melalui `http://localhost:8080`
 
 ## UML Diagram
 
-![alt text](UMLDiagram.png)
+<img width="1934" height="518" alt="bLPHRzCm47wlrFzWxG4osWuatYfKhOCzL6BJDFQEdFYMcYPsiPr2GUEtx-mqYUEu7UjR_7rt_huxdzrBRQWoLLcCHth3nPOgMfAie5elZL4yhGoiCYc-yJz0FlYSKWgPhPKiWHXLWG_fDMNo5nSvUQI5HcWysj9iGtCWPzV2SBCdxycDP52SaR_Z4S6Vsv5SIRbfLknlHZZxFYTS67yD4nI" src="https://github.com/user-attachments/assets/afb1d9fe-c798-4f8d-b956-61090465ae93" />
+
 
 ## Limitation
  - Mekanisme penggunaan pada halaman web tidak menggunakan sistem otentikasi, sehingga siapapun yang mengetahui ID seseorang yang terdaftar dapat melakukan peminjaman atas nama ID tersebut.
