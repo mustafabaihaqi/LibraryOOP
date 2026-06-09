@@ -29,3 +29,6 @@ Akses Web sebagai user melalui `http://localhost:8080`
 ## Limitation
  - Mekanisme penggunaan pada halaman web tidak menggunakan sistem otentikasi, sehingga siapapun yang mengetahui ID seseorang yang terdaftar dapat melakukan peminjaman atas nama ID tersebut.
  - Pengembangan Web menggunakan penggabungan HTML secara manual dalam `main.cpp` sehingga file c++ tersebut menjadi sangat panjang (sulit dimanage).
+
+
+_Aplikasi dibuat dengan bantuan generative AI untuk sintaks program._
