@@ -4,23 +4,25 @@
 #include <unistd.h>
 #include <iomanip>
 #include <limits>
-#include "Database.h"
-#include "Repository.h"
+#include <thread>
+#include "httplib.h"
+#include "database.h"
+#include "repository.h"
 
-// Fungsi helper untuk menyamarkan input password di terminal Linux/WSL
+// Fungsi untuk menyamarkan password di terminal
 std::string getHiddenPassword() {
     std::string password;
     termios oldt;
-    tcgetattr(STDIN_FILENO, &oldt); // Simpan pengaturan terminal saat ini
+    tcgetattr(STDIN_FILENO, &oldt); 
     
     termios newt = oldt;
-    newt.c_lflag &= ~ECHO; // Matikan fitur echo (menampilkan ketikan)
+    newt.c_lflag &= ~ECHO; 
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
 
     std::cin >> password;
 
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Kembalikan pengaturan terminal seperti semula
-    std::cout << std::endl; // Tambahkan enter karena tombol enter saat echo mati tidak terlihat
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    std::cout << std::endl; 
     return password;
 }
 
@@ -30,7 +32,6 @@ bool verifyLogin(Database& db, const std::string& username, const std::string& p
     sqlite3_stmt* stmt;
     bool isValid = false;
 
-    // Menyiapkan statement SQL agar aman dari injeksi
     if (sqlite3_prepare_v2(db.getConnection(), sql.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
         sqlite3_bind_text(stmt, 2, password.c_str(), -1, SQLITE_TRANSIENT);
@@ -44,6 +45,7 @@ bool verifyLogin(Database& db, const std::string& username, const std::string& p
     return isValid;
 }
 
+// Halaman Manage Books di CLI
 void manageBooks(BookRepository& bookRepo) {
     char action;
     bool inMenu = true;
@@ -53,7 +55,7 @@ void manageBooks(BookRepository& bookRepo) {
         std::cout << "                    MANAGE BOOKS                      \n";
         std::cout << "======================================================\n";
         
-        // 1. Tampilkan Daftar Buku (Format Tabel)
+        // Menampilkan Daftar Buku
         auto books = bookRepo.listAll();
         std::cout << std::left << std::setw(5) << "ID" 
                   << std::setw(30) << "Title" 
@@ -68,11 +70,9 @@ void manageBooks(BookRepository& bookRepo) {
         }
         std::cout << "------------------------------------------------------\n";
 
-        // 2. Opsi Aksi CRUD
         std::cout << "Action [a]dd, [e]dit, [d]elete, [b]ack: ";
         std::cin >> action;
 
-        // Membersihkan buffer cin untuk menghindari error getline setelahnya
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         switch (tolower(action)) {
@@ -106,6 +106,7 @@ void manageBooks(BookRepository& bookRepo) {
                 }
                 break;
             }
+            // Fitur Edit Buku
             case 'e': {
                 int id;
                 std::cout << ">> Edit Buku\nMasukkan ID Buku yang akan diedit: ";
@@ -128,7 +129,7 @@ void manageBooks(BookRepository& bookRepo) {
                         std::string finalAuthor = newAuthor.empty() ? b.getAuthor() : newAuthor;
                         
                         Book updatedBook(id, finalTitle, finalAuthor);
-                        updatedBook.setAvailable(b.isAvailable()); // Pertahankan status ketersediaan
+                        updatedBook.setAvailable(b.isAvailable()); 
                         bookRepo.save(updatedBook);
                         std::cout << "[OK] Buku berhasil diperbarui.\n";
                     } catch (const std::exception& e) {
@@ -143,7 +144,7 @@ void manageBooks(BookRepository& bookRepo) {
                 if (std::cin >> id) {
                     try {
                         Book b = bookRepo.findById(id);
-                        // Validasi tambahan: Buku yang sedang dipinjam tidak boleh dihapus 
+                        // Buku yang sedang dipinjam tidak boleh dihapus 
                         if (!b.isAvailable()) {
                             std::cout << "[!] Gagal: Buku sedang dipinjam dan tidak dapat dihapus.\n";
                         } else {
@@ -165,7 +166,7 @@ void manageBooks(BookRepository& bookRepo) {
     }
 }
 
-// === FUNGSI SUB-MENU MANAGE MEMBERS ===
+// Halaman Manage Members di CLI
 void manageMembers(MemberRepository& memberRepo) {
     char action;
     bool inMenu = true;
@@ -175,7 +176,7 @@ void manageMembers(MemberRepository& memberRepo) {
         std::cout << "                    MANAGE MEMBERS                    \n";
         std::cout << "======================================================\n";
         
-        // 1. Tampilkan Daftar Anggota
+        // Tampilkan Daftar Anggota
         auto members = memberRepo.listAll();
         std::cout << std::left << std::setw(10) << "ID" 
                   << std::setw(25) << "Name" 
@@ -188,18 +189,16 @@ void manageMembers(MemberRepository& memberRepo) {
         }
         std::cout << "------------------------------------------------------\n";
 
-        // 2. Opsi Aksi CRUD
         std::cout << "Action [a]dd, [e]dit, [d]elete, [b]ack: ";
         std::cin >> action;
 
-        // Membersihkan buffer cin
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         switch (tolower(action)) {
             case 'a': {
                 std::string id, name, email;
                 
-                std::cout << ">> Tambah Anggota Baru\nMasukkan ID (misal M003): ";
+                std::cout << ">> Tambah Anggota Baru\nMasukkan ID: ";
                 std::getline(std::cin, id);
 
                 try {
@@ -268,7 +267,7 @@ void manageMembers(MemberRepository& memberRepo) {
     }
 }
 
-// === FUNGSI SUB-MENU ISSUE / RETURN LOAN ===
+// Halaman Issue / Return Loan
 void manageLoans(LoanRepository& loanRepo, BookRepository& bookRepo, MemberRepository& memberRepo) {
     char action;
     bool inMenu = true;
@@ -278,6 +277,7 @@ void manageLoans(LoanRepository& loanRepo, BookRepository& bookRepo, MemberRepos
         std::cout << "                 ISSUE / RETURN LOAN                  \n";
         std::cout << "======================================================\n";
         
+        // Tampilkan Buku yang Dipinjam
         auto activeLoans = loanRepo.listActiveLoans();
         std::cout << std::left << std::setw(5) << "ID" 
                   << std::setw(25) << "Book Title" 
@@ -365,10 +365,195 @@ void manageLoans(LoanRepository& loanRepo, BookRepository& bookRepo, MemberRepos
     }
 }
 
+// CSS untuk web
+std::string getCommonCSS() {
+    return "<style>"
+           "body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; }"
+           ".header { background-color: #00416b; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }"
+           ".header h1 { margin: 0; font-size: 24px; }"
+           ".container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }"
+           ".search-bar { margin-bottom: 20px; display: flex; gap: 10px; }"
+           ".search-bar input[type='text'] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }"
+           ".search-bar button { padding: 8px 15px; background-color: #00416b; color: white; border: none; border-radius: 4px; cursor: pointer; }"
+           ".book-card { display: flex; justify-content: space-between; align-items: center; padding: 15px; border: 1px solid #e0e0e0; margin-bottom: 10px; border-radius: 4px; }"
+           ".book-title { font-weight: bold; font-size: 16px; }"
+           ".book-author { color: #666; font-style: italic; margin-left: 10px; }"
+           ".status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; color: white; }"
+           ".status-available { background-color: #28a745; }"
+           ".status-loan { background-color: #6c757d; }"
+           ".btn-return { background-color: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }"
+           ".nav-link { color: white; text-decoration: none; font-weight: bold; margin-left: 15px; }"
+           "</style>";
+}
+
+// === FUNGSI WEB SERVER UTAMA ===
+void startWebServer(BookRepository& bookRepo, MemberRepository& memberRepo, LoanRepository& loanRepo) {
+    httplib::Server svr;
+
+    // Landing Page (Daftar Semua Buku)
+    svr.Get("/", [&bookRepo](const httplib::Request&, httplib::Response& res) {
+        std::string html = "<html><head><title>UGM Library</title>" + getCommonCSS() + "</head><body>";
+        html += "<div class='header'><h1>Perpustakaan UGM</h1>"
+                "<div><a class='nav-link' href='/'>Katalog</a>"
+                "<form action='/me' method='GET' style='display:inline; margin-left:15px;'>"
+                "<input type='text' name='id' placeholder='Masukkan NIM' required style='padding:4px; border-radius:4px; border:none;'>"
+                "<button type='submit' style='padding:4px 8px; margin-left:5px; cursor:pointer;'>Go</button>"
+                "</form></div></div>";
+        
+        html += "<div class='container'>";
+        html += "<form class='search-bar' action='/search' method='GET'>"
+                "<input type='text' name='q' placeholder='Cari judul atau penulis...' required>"
+                "<button type='submit'>Cari</button>"
+                "</form>";
+
+        auto books = bookRepo.listAll();
+        for (const auto& b : books) {
+            html += "<div class='book-card'><div>";
+            html += "<span class='book-title'>" + b.getTitle() + "</span>";
+            html += "<span class='book-author'>" + b.getAuthor() + "</span></div>";
+            
+            if (b.isAvailable()) {
+                // Form peminjaman langsung di tempat dengan memasukkan ID Anggota
+                html += "<form action='/borrow' method='POST' style='margin:0; display:flex; gap:5px;'>";
+                html += "<input type='hidden' name='book_id' value='" + std::to_string(b.getId()) + "'>";
+                html += "<input type='text' name='member_id' placeholder='Masukkan NIM' required style='padding:5px; border:1px solid #ccc; border-radius:4px; font-size:12px;'>";
+                html += "<button type='submit' style='background-color:#28a745; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; font-weight:bold;'>Pinjam</button>";
+                html += "</form>";
+            } else {
+                html += "<span class='status-badge status-loan'>Dipinjam</span>";
+            }
+            html += "</div>";
+        }
+        html += "</div></body></html>";
+        res.set_content(html, "text/html");
+    });
+
+    // Fitur Pencarian Kata Kunci Sederhana
+    svr.Get("/search", [&bookRepo](const httplib::Request& req, httplib::Response& res) {
+        std::string query = req.get_param_value("q");
+        // Mengubah query ke lowercase untuk pencarian case-insensitive sederhana
+        std::transform(query.begin(), query.end(), query.begin(), ::tolower);
+
+        std::string html = "<html><head><title>Hasil Pencarian</title>" + getCommonCSS() + "</head><body>";
+        html += "<div class='header'><h1>Hasil Pencarian untuk: \"" + req.get_param_value("q") + "\"</h1><a class='nav-link' href='/'>&larr; Kembali</a></div>";
+        html += "<div class='container'>";
+
+        auto books = bookRepo.listAll();
+        int foundCount = 0;
+        for (const auto& b : books) {
+            std::string titleLower = b.getTitle();
+            std::string authorLower = b.getAuthor();
+            std::transform(titleLower.begin(), titleLower.end(), titleLower.begin(), ::tolower);
+            std::transform(authorLower.begin(), authorLower.end(), authorLower.begin(), ::tolower);
+
+            if (titleLower.find(query) != std::string::npos || authorLower.find(query) != std::string::npos) {
+                foundCount++;
+                html += "<div class='book-card'><div>";
+                html += "<span class='book-title'>" + b.getTitle() + "</span>";
+                html += "<span class='book-author'>" + b.getAuthor() + "</span></div>";
+                html += (b.isAvailable() ? "<span class='status-badge status-available'>Tersedia</span>" : "<span class='status-badge status-loan'>On Loan</span>");
+                html += "</div>";
+            }
+        }
+
+        if (foundCount == 0) {
+            html += "<p style='text-align:center; color:#666;'>Buku tidak ditemukan. Coba kata kunci lain.</p>";
+        }
+        html += "</div></body></html>";
+        res.set_content(html, "text/html");
+    });
+
+    // Memproses Pinjam Buku dari Web
+    svr.Post("/borrow", [&bookRepo, &memberRepo, &loanRepo](const httplib::Request& req, httplib::Response& res) {
+        std::string bookIdStr = req.get_param_value("book_id");
+        std::string memberId = req.get_param_value("member_id");
+
+        try {
+            int bookId = std::stoi(bookIdStr);
+            // Validasi apakah NIM/ID Anggota terdaftar di DB
+            memberRepo.findById(memberId); 
+            Book b = bookRepo.findById(bookId);
+
+            if (b.isAvailable()) {
+                loanRepo.issueLoan(bookId, memberId);
+                // Jika sukses, langsung arahkan ke halaman pinjaman milik member tersebut
+                res.set_redirect("/me?id=" + memberId);
+            } else {
+                res.set_content("<h1>[!] Gagal: Buku sudah dipinjam orang lain.</h1><a href='/'>Kembali</a>", "text/html");
+            }
+        } catch (...) {
+            res.set_content("<h1>[!] Error: NIM/ID Anggota tidak terdaftar atau data salah!</h1><a href='/'>Kembali Ke Katalog</a>", "text/html");
+        }
+    });
+
+    // Halaman Web Daftar Pinjaman Aktif Anggota
+    svr.Get("/me", [&memberRepo, &loanRepo](const httplib::Request& req, httplib::Response& res) {
+        std::string memberId = req.get_param_value("id");
+        
+        std::string html = "<html><head><title>Pinjamanku</title>" + getCommonCSS() + "</head><body>";
+        try {
+            auto member = memberRepo.findById(memberId);
+            html += "<div class='header'><h1>Pinjamanku</h1><span class='nav-link'>Halo, " + member.getName() + " (" + member.getId() + ")</span></div>";
+            html += "<div class='container'>";
+            html += "<h3>Buku yang Dipinjam:</h3>";
+
+            auto allLoans = loanRepo.listActiveLoans();
+            int loanCount = 0;
+            
+            for (const auto& l : allLoans) {
+                // menampilkan buku yang dipinjam oleh anggota dengan ID
+                if (l.memberId == memberId) {
+                    loanCount++;
+                    html += "<div class='book-card'><div>";
+                    html += "<span class='book-title'>" + l.bookTitle + "</span><br>";
+                    html += "<small style='color:#666;'>Kembalikan Sebelum: " + l.dueDate + "</small></div>";
+                    
+                    // Tombol Return untuk mengembalikan langsung dari web
+                    html += "<form action='/return' method='POST' style='margin:0;'>";
+                    html += "<input type='hidden' name='book_id' value='" + std::to_string(l.bookId) + "'>";
+                    html += "<input type='hidden' name='member_id' value='" + memberId + "'>";
+                    html += "<button type='submit' class='btn-return'>Kembalikan</button>";
+                    html += "</form>";
+                    html += "</div>";
+                }
+            }
+
+            if (loanCount == 0) {
+                html += "<p style='color:#666;'>Kamu tidak sedang meminjam buku apapun saat ini.</p>";
+            }
+            
+            html += "<br><a href='/' style='display:inline-block; text-decoration:none; color:#0066b2; font-weight:bold;'>&larr; Kembali ke Katalog Utama</a>";
+        } catch (...) {
+            html += "<div class='header'><h1>Error</h1><a class='nav-link' href='/'>Kembali</a></div>";
+            html += "<div class='container'><p style='color:red; text-align:center;'>[!] Profil gagal dimuat. ID Anggota / NIM tidak valid atau tidak ditemukan.</p></div>";
+        }
+
+        html += "</div></body></html>";
+        res.set_content(html, "text/html");
+    });
+
+    // Pengembalian Buku dari Web
+    svr.Post("/return", [&loanRepo](const httplib::Request& req, httplib::Response& res) {
+        std::string bookIdStr = req.get_param_value("book_id");
+        std::string memberId = req.get_param_value("member_id");
+
+        try {
+            int bookId = std::stoi(bookIdStr);
+            loanRepo.returnLoan(bookId);
+            res.set_redirect("/me?id=" + memberId);
+        } catch (...) {
+            res.set_redirect("/");
+        }
+    });
+
+    svr.listen("localhost", 8080);
+}
+
 int main() {
     Database db("data.db");
 
-    // === 1. SETUP DATABASE ===
+    sqlite3_busy_timeout(db.getConnection(), 1000);
+    //=== 1. SETUP DATABASE ===
     std::string createTableSQL = 
         "CREATE TABLE IF NOT EXISTS books (" 
         "id INTEGER PRIMARY KEY, " 
@@ -395,20 +580,28 @@ int main() {
         "FOREIGN KEY(member_id) REFERENCES members(id));";
     db.exec(createTableSQL);
 
-    // std::string seedDataSQL = 
-    //     "INSERT OR IGNORE INTO books (id, title, author, available) VALUES "
-    //     "(1, 'Laskar Pelangi', 'Nidji', 1), "
-    //     "(2, 'Kicau Mania', 'Ndarboy Genk', 1), "
-    //     "(3, '67', 'brainrot', 0), "
-    //     "(4, 'Skripsi susah? Ternak lele aja', 'Mahasiswa desperate', 1), "
-    //     "(5, 'Trik Sukses Bisnis Angkringan', 'Yanto GOR Pancasila', 1);"
+    std::string seedDataSQL = 
+        "INSERT OR IGNORE INTO books (id, title, author, available) VALUES "
+        "(1, 'Laskar Pelangi', 'Nidji', 1), "
+        "(2, 'Kicau Mania', 'Ndarboy Genk', 1), "
+        "(3, '67', 'brainrot', 1), "
+        "(4, 'Skripsi susah? Ternak lele aja', 'Mahasiswa desperate', 1), "
+        "(5, 'Trik Sukses Bisnis Angkringan', 'Yanto GOR Pancasila', 1);"
 
-    //     "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'admin123', 'admin');"
+        "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES ('admin', 'admin123', 'admin');"
 
-    //     "INSERT OR IGNORE INTO members (id, name, email) VALUES "
-    //     "('M001', 'Budi Santoso', 'budi@example.com'), "
-    //     "('M002', 'Siti Aminah', 'siti@example.com');";
-    // db.exec(seedDataSQL);
+        "INSERT OR IGNORE INTO members (id, name, email) VALUES "
+        "('M001', 'Budi Santoso', 'budi@example.com'), "
+        "('M002', 'Siti Aminah', 'siti@example.com');";
+    db.exec(seedDataSQL);
+
+    // Menyalakan Web Server di background
+    BookRepository bookRepo(db);
+    MemberRepository memberRepo(db);
+    LoanRepository loanRepo(db);
+    std::cout << ">> Memulai Web Server (http://localhost:8080)...\n";
+    std::thread webThread(startWebServer, std::ref(bookRepo), std::ref(memberRepo), std::ref(loanRepo));
+    webThread.detach();
 
     // === SISTEM LOGIN CLI ===
     std::cout << "== Library Admin Console ==" << std::endl; 
@@ -444,9 +637,6 @@ int main() {
     std::cout << "[OK] Login OK. Welcome, " << username << ".\n" << std::endl; // 
 
     // === 3. MENU UTAMA ===
-    BookRepository bookRepo(db);
-    MemberRepository memberRepo(db);
-    LoanRepository loanRepo(db);
     char choice;
     bool running = true;
 
@@ -474,7 +664,7 @@ int main() {
             case 'Q':
             case 'q':
                 std::cout << "\nKeluar dari sistem. Terima kasih, " << username << "!\n";
-                running = false; // Menghentikan perulangan
+                running = false; 
                 break;
             default:
                 std::cout << "\n[!] Pilihan tidak valid. Silakan masukkan 1, 2, 3, atau Q.\n";

@@ -1,6 +1,6 @@
 #pragma once
 #include <vector>
-#include "Database.h"
+#include "database.h"
 
 template <typename T>
 class Repository {
@@ -12,8 +12,7 @@ public:
     virtual ~Repository() = default;
 };
 
-// Implementasi spesifik untuk entitas Book
-#include "Book.h"
+#include "book.h"
 
 class BookRepository : public Repository<Book> {
 private:
@@ -44,7 +43,9 @@ public:
 
 struct LoanRecord {
     int loanId;
+    int bookId;
     std::string bookTitle;
+    std::string memberId;
     std::string memberName;
     std::string dueDate;
 };

@@ -1,4 +1,4 @@
-#include "Database.h"
+#include "database.h"
 #include <iostream>
 
 Database::Database(const std::string& dbFile) {

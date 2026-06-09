@@ -1,8 +1,8 @@
 CXX = g++
 
-CXXFLAGS = -std=c++17 -Wall -Wextra
+CXXFLAGS = -std=c++17 -Wall -Wextra -pthread
 
-# Flag untuk menghubungkan library eksternal (contoh: SQLite)
+# Flag untuk menghubungkan library eksternal
 LDFLAGS = -lsqlite3
 
 # Mencari semua file .cpp di dalam folder src/
@@ -11,7 +11,7 @@ SRCS = $(wildcard src/*.cpp)
 # Mengubah ekstensi .cpp menjadi .o untuk proses kompilasi sementara
 OBJS = $(SRCS:.cpp=.o)
 
-# Nama file eksekusi akhir (sesuai spesifikasi CLI)
+# Nama file eksekusi akhir
 TARGET = admin
 
 # Aturan utama: ketika perintah 'make' dijalankan, ia akan membuat target

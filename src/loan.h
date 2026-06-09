@@ -4,8 +4,8 @@
 class Loan {
 private:
     int loanId_;
-    int bookId_;         // Foreign key ke Book
-    std::string memberId_; // Foreign key ke Member
+    int bookId_;         
+    std::string memberId_; 
     std::string dueDate_;
 
 public:

@@ -1,21 +1,18 @@
-#include "Repository.h"
+#include "repository.h"
 #include <iostream>
 #include <stdexcept>
 
-// 1. Mengambil satu buku berdasarkan ID
+// Find by ID Buku
 Book BookRepository::findById(int id) {
     std::string sql = "SELECT id, title, author, available FROM books WHERE id = ?;";
     sqlite3_stmt* stmt;
     
-    // Prepare statement
     if (sqlite3_prepare_v2(db_.getConnection(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
         throw std::runtime_error("Gagal menyiapkan statement findById");
     }
 
-    // Bind parameter '?' pertama dengan nilai 'id'
     sqlite3_bind_int(stmt, 1, id);
 
-    // Step: Eksekusi query
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         int bookId = sqlite3_column_int(stmt, 0);
         std::string title = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
@@ -25,7 +22,7 @@ Book BookRepository::findById(int id) {
         Book book(bookId, title, author);
         book.setAvailable(available);
         
-        sqlite3_finalize(stmt); // Bersihkan memory
+        sqlite3_finalize(stmt); 
         return book;
     }
 
@@ -33,7 +30,7 @@ Book BookRepository::findById(int id) {
     throw std::runtime_error("Buku dengan ID tersebut tidak ditemukan.");
 }
 
-// 2. Mengambil semua buku dari database
+// Mengambil semua buku dari database
 std::vector<Book> BookRepository::listAll() {
     std::vector<Book> books;
     std::string sql = "SELECT id, title, author, available FROM books;";
@@ -44,7 +41,7 @@ std::vector<Book> BookRepository::listAll() {
         return books;
     }
 
-    // Looping selama masih ada baris data (SQLITE_ROW)
+    // Looping selama masih ada data
     while (sqlite3_step(stmt) == SQLITE_ROW) {
         int bookId = sqlite3_column_int(stmt, 0);
         std::string title = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
@@ -60,9 +57,9 @@ std::vector<Book> BookRepository::listAll() {
     return books;
 }
 
-// 3. Menyimpan (Insert) atau Memperbarui (Update) buku
+// Insert dan Update Buku
 void BookRepository::save(const Book& obj) {
-    // Menggunakan INSERT OR REPLACE agar berfungsi ganda (tambah baru atau update yang ada)
+    // Insert or Replace untuk menambah maupun mengupdate
     std::string sql = "INSERT OR REPLACE INTO books (id, title, author, available) VALUES (?, ?, ?, ?);";
     sqlite3_stmt* stmt;
 
@@ -71,7 +68,6 @@ void BookRepository::save(const Book& obj) {
         return;
     }
 
-    // Bind data dari objek Book ke query SQL
     sqlite3_bind_int(stmt, 1, obj.getId());
     sqlite3_bind_text(stmt, 2, obj.getTitle().c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 3, obj.getAuthor().c_str(), -1, SQLITE_TRANSIENT);
@@ -84,7 +80,7 @@ void BookRepository::save(const Book& obj) {
     sqlite3_finalize(stmt);
 }
 
-// 4. Menghapus buku berdasarkan ID
+// Menghapus buku berdasarkan ID
 void BookRepository::remove(int id) {
     std::string sql = "DELETE FROM books WHERE id = ?;";
     sqlite3_stmt* stmt;
@@ -103,8 +99,7 @@ void BookRepository::remove(int id) {
     sqlite3_finalize(stmt);
 }
 
-// === IMPLEMENTASI MEMBER REPOSITORY ===
-
+// Find By ID Member
 Member MemberRepository::findById(const std::string& id) {
     std::string sql = "SELECT id, name, email FROM members WHERE id = ?;";
     sqlite3_stmt* stmt;
@@ -113,7 +108,6 @@ Member MemberRepository::findById(const std::string& id) {
         throw std::runtime_error("Gagal menyiapkan statement findById Member");
     }
 
-    // Bind parameter text untuk ID
     sqlite3_bind_text(stmt, 1, id.c_str(), -1, SQLITE_TRANSIENT);
 
     if (sqlite3_step(stmt) == SQLITE_ROW) {
@@ -130,6 +124,7 @@ Member MemberRepository::findById(const std::string& id) {
     throw std::runtime_error("Anggota dengan ID tersebut tidak ditemukan.");
 }
 
+// Mengambil semua data member
 std::vector<Member> MemberRepository::listAll() {
     std::vector<Member> members;
     std::string sql = "SELECT id, name, email FROM members;";
@@ -152,6 +147,7 @@ std::vector<Member> MemberRepository::listAll() {
     return members;
 }
 
+// Insert atau update member
 void MemberRepository::save(const Member& obj) {
     std::string sql = "INSERT OR REPLACE INTO members (id, name, email) VALUES (?, ?, ?);";
     sqlite3_stmt* stmt;
@@ -172,6 +168,7 @@ void MemberRepository::save(const Member& obj) {
     sqlite3_finalize(stmt);
 }
 
+// Delete Member by ID
 void MemberRepository::remove(const std::string& id) {
     std::string sql = "DELETE FROM members WHERE id = ?;";
     sqlite3_stmt* stmt;
@@ -190,21 +187,25 @@ void MemberRepository::remove(const std::string& id) {
     sqlite3_finalize(stmt);
 }
 
-// === IMPLEMENTASI LOAN REPOSITORY ===
-
+// Menyimpan Pinjaman
 void LoanRepository::issueLoan(int bookId, const std::string& memberId) {
-    // 1. Masukkan data ke tabel loans dengan due_date 7 hari dari sekarang
     std::string sqlInsert = "INSERT INTO loans (book_id, member_id, due_date) VALUES (?, ?, date('now', '+7 days'));";
     sqlite3_stmt* stmt;
     
     if (sqlite3_prepare_v2(db_.getConnection(), sqlInsert.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, bookId);
         sqlite3_bind_text(stmt, 2, memberId.c_str(), -1, SQLITE_TRANSIENT);
-        sqlite3_step(stmt);
+        
+        // Pengecekan Error saat mengeksekusi Insert
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cout << "\n[!] ALARM ERROR INSERT: " << sqlite3_errmsg(db_.getConnection()) << "\n";
+        }
         sqlite3_finalize(stmt);
+    } else {
+        std::cout << "\n[!] ALARM ERROR PREPARE INSERT: " << sqlite3_errmsg(db_.getConnection()) << "\n";
     }
 
-    // 2. Ubah status buku menjadi tidak tersedia (0)
+    // Ubah status peminjaman buku
     std::string sqlUpdate = "UPDATE books SET available = 0 WHERE id = ?;";
     if (sqlite3_prepare_v2(db_.getConnection(), sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
         sqlite3_bind_int(stmt, 1, bookId);
@@ -213,29 +214,10 @@ void LoanRepository::issueLoan(int bookId, const std::string& memberId) {
     }
 }
 
-void LoanRepository::returnLoan(int bookId) {
-    // Hapus riwayat dari tabel loans
-    std::string sqlDelete = "DELETE FROM loans WHERE book_id = ?;";
-    sqlite3_stmt* stmt;
-
-    if (sqlite3_prepare_v2(db_.getConnection(), sqlDelete.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int(stmt, 1, bookId);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
-    }
-
-    // 2. Ubah status buku kembali tersedia 
-    std::string sqlUpdate = "UPDATE books SET available = 1 WHERE id = ?;";
-    if (sqlite3_prepare_v2(db_.getConnection(), sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
-        sqlite3_bind_int(stmt, 1, bookId);
-        sqlite3_step(stmt);
-        sqlite3_finalize(stmt);
-    }
-}
-
+// Daftar Loans
 std::vector<LoanRecord> LoanRepository::listActiveLoans() {
     std::vector<LoanRecord> activeLoans;
-    std::string sql = "SELECT l.id, b.title, m.name, l.due_date "
+    std::string sql = "SELECT l.id, l.book_id, b.title, l.member_id, m.name, l.due_date "
                       "FROM loans l "
                       "JOIN books b ON l.book_id = b.id "
                       "JOIN members m ON l.member_id = m.id;";
@@ -245,12 +227,37 @@ std::vector<LoanRecord> LoanRepository::listActiveLoans() {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             LoanRecord record;
             record.loanId = sqlite3_column_int(stmt, 0);
-            record.bookTitle = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            record.memberName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
-            record.dueDate = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            record.bookId = sqlite3_column_int(stmt, 1);
+            record.bookTitle = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            record.memberId = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+            record.memberName = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            record.dueDate = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
             activeLoans.push_back(record);
         }
+    } else {
+        // indikator error
+        std::cout << "\n[!] ALARM ERROR SELECT LOANS: " << sqlite3_errmsg(db_.getConnection()) << "\n";
     }
     sqlite3_finalize(stmt);
     return activeLoans;
+}
+
+void LoanRepository::returnLoan(int bookId) {
+    // Hapus data buku dari tabel loans
+    std::string sqlDelete = "DELETE FROM loans WHERE book_id = ?;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlDelete.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    // Ubah status buku kembali tersedia 
+    std::string sqlUpdate = "UPDATE books SET available = 1 WHERE id = ?;";
+    if (sqlite3_prepare_v2(db_.getConnection(), sqlUpdate.c_str(), -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, bookId);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
 }
